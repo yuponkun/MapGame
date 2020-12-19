@@ -273,11 +273,11 @@ public class MapData {
         "png/WALL.png"
     };
 
-    /** イメージ(画像を読み込むjavafxのパーツ)型の配列 */
+    /** イメージ(画像を読み込むjavafxのパーツ)の配列 */
     private Image[] mapImages;
-    /** イメージビュー型の2次元配列 */
+    /** イメージビューの2次元配列 */
     private ImageView[][] mapImageViews;
-    /** マップの画像の番号を入れるint型の2次元配列 */
+    /** マップの画像の番号を入れる2次元配列 */
     private int[][] maps;
     /** 横幅 */
     private int width;
@@ -303,7 +303,7 @@ public class MapData {
         width = x;
         // 縦幅をheightに代入
         height = y;
-        // int型のy*xの2次元配列をmapsに代入
+        // y*xの2次元配列をmapsに代入
         maps = new int[y][x];
 
         // fillMapメソッドでmaps全てに壁の画像の番号を設定
@@ -422,6 +422,243 @@ public class MapData {
             if (getMap(x+dx*2, y+dy*2) == MapData.TYPE_WALL){
                 setMap(x+dx, y+dy, MapData.TYPE_SPACE);
                 digMap(x+dx*2, y+dy*2);
+            }
+        }
+    }
+}
+```
+
+### MoveChara.java
+
+```Java
+// 以下インポート
+// javafx.scene.imageパッケージのImageクラス
+import javafx.scene.image.Image;
+// javafx.scene.imageパッケージのImageViewクラス
+import javafx.scene.image.ImageView;
+// javafx.scene.shapeパッケージのRectangleクラス
+import javafx.scene.shape.Rectangle;
+// javafx.animationパッケージのAnimationTimerクラス
+import javafx.animation.AnimationTimer;
+
+/**
+ * キャラをモデリングするクラス(MVCのM)
+ * @version 0.0
+ */
+public class MoveChara {
+    /** 下向きのキャラの画像を指定する番号 */
+    public static final int TYPE_DOWN  = 0;
+    /** 左向きのキャラの画像を指定する番号 */
+    public static final int TYPE_LEFT  = 1;
+    /** 右向きのキャラの画像を指定する番号 */
+    public static final int TYPE_RIGHT = 2;
+    /** 上向きのキャラの画像を指定する番号 */
+    public static final int TYPE_UP    = 3;
+
+    /** 上下左右それぞれの文字列が入った配列 */
+    private final String[] directions  = { "Down", "Left", "Right", "Up" };
+    /** 足踏みアニメーションの際のキャラの画像を切り替えるための番号(文字列)が入った配列 */
+    private final String[] animationNumbers = { "1", "2", "3" };
+    /** キャラの画像の場所(パス)の名前で全てに共通するところを抜き出した文字列 */
+    private final String pngPathBefore = "png/cat";
+    /** キャラの画像の拡張子を表す文字列 */
+    private final String pngPathAfter  = ".png";
+
+    /** x座標 */
+    private int posX;
+    /** y座標 */
+    private int posY;
+
+    /** マップ */
+    private MapData mapData;
+
+    /** イメージの2次元配列 */
+    private Image[][] charaImages;
+    /** イメージビューの配列 */
+    private ImageView[] charaImageViews;
+    /** イメージアニメーション(キャラを足踏みさせるクラス)の配列 *//
+    private ImageAnimation[] charaImageAnimations;
+
+    /** キャラの向きの番号 *//
+	  private int charaDirection;
+
+    /**
+     * キャラを生成するときに呼ばれる処理(コンストラクタ)
+     * @param startX 初期x座標
+     * @param startY 初期y座標
+     * @param mapData マップ
+     */
+    MoveChara(int startX, int startY, MapData mapData){
+        // マップをmaoDataに代入
+        this.mapData = mapData;
+
+        // 4*3のイメージ2次元配列をcharaImagesに代入
+        charaImages = new Image[4][3];
+        // 4つ分のイメージビュー配列をcharaImageViewsに代入
+        charaImageViews = new ImageView[4];
+        // 4つ分のイメージアニメーション配列をcharaImageAnimationsに代入
+        charaImageAnimations = new ImageAnimation[4];
+
+        // キャラの画像を配列に設定
+        for (int i=0; i<4; i++) {
+            charaImages[i] = new Image[3];
+            for (int j=0; j<3; j++) {
+                charaImages[i][j] = new Image(pngPathBefore + directions[i] + animationNumbers[j] + pngPathAfter);
+            }
+            charaImageViews[i] = new ImageView(charaImages[i][0]);
+            charaImageAnimations[i] = new ImageAnimation( charaImageViews[i], charaImages[i] );
+        }
+        
+        // 初期x座標をposXに代入
+        posX = startX;
+        // 初期y座標をposYに代入
+        posY = startY;
+
+        // setCharaDirectonでキャラの向きを右に設定
+        setCharaDirection(TYPE_RIGHT);
+    }
+
+    /**
+     * charaDirectionのセッター
+     * @param cd キャラの向きを示す番号
+     */
+    public void setCharaDirection(int cd){
+        // キャラの向きを示す番号をcharaDirectionに代入
+        charaDirection = cd;
+        // 足踏みアニメーションを開始する
+        for (int i=0; i<4; i++) {
+            if (i == charaDirection) {
+                charaImageAnimations[i].start();
+            } else {
+                charaImageAnimations[i].stop();
+            }
+        }
+    }
+
+    /**
+     * 1マス先に進めるかの確認
+     * @param dx x座標の増加分
+     * @param dy y座標の増加分
+     * @return 1マス先が空白の場合true そのほかの場合false
+     */
+    public boolean isMovable(int dx, int dy){
+        // 1マス先の画像番号をみて空白の場合のみtrue
+        if (mapData.getMap(posX+dx, posY+dy) == MapData.TYPE_WALL){
+            return false;
+        } else if (mapData.getMap(posX+dx, posY+dy) == MapData.TYPE_SPACE){
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 1マス先にすすめる場合座標をその分変更
+     * @param dx x座標の増加分
+     * @param dy y座標の増加分
+     * @return 進める場合true そのほかの場合false
+     */
+    public boolean move(int dx, int dy){
+        // isMovableメソッドで進めるか確認して進める場合座標をその分変更
+        if (isMovable(dx,dy)){
+            posX += dx;
+            posY += dy;
+            return true;
+        }else {
+            return false;
+        }
+    }
+
+    /**
+     * charaImageViewsのゲッター
+     * @return charaImageViews
+     */
+    public ImageView getCharaImageView(){
+        return charaImageViews[charaDirection];
+    }
+
+    /**
+     * posXのゲッター
+     * @return posX
+     */
+    public int getPosX(){
+        return posX;
+    }
+
+    /**
+     * posYのゲッター
+     * @return posY
+     */
+    public int getPosY(){
+        return posY;
+    }
+
+    /**
+     * 足踏みアニメーションをするクラス
+     * @version 0.0
+     */
+    private class ImageAnimation extends AnimationTimer {
+
+        /** イメージビュー */
+        private ImageView charaView = null;
+        /** イメージ配列 */
+        private Image[] charaImages = null;
+        /** キャラの向きの画像を切り替える番号 */
+        private int index = 0;
+
+        /** 切り替える間隔(0.5秒) */
+        private long duration = 500 * 1000000L;
+        /** 初期時間設定 */
+        private long startTime = 0;
+
+        /** 時間のカウンタ */
+        private long count = 0L;
+        /** ひとつ前のカウンタの値を保持　*/
+        private long preCount;
+        /** indexを増やすか減らすかの判定 */
+        private boolean isPlus = true;
+
+        /**
+         * アニメーションが生成されたとき呼ばれる処理(コンストラクタ)
+         * @param charaView キャラのイメージビュー
+         * @param images キャラのイメージ配列
+         */
+        public ImageAnimation( ImageView charaView , Image[] images ) {
+            // キャラのイメージビューをcharaViewに代入
+            this.charaView = charaView;
+            // キャラのイメージ配列をcharaImagesに代入
+            this.charaImages = images;
+            // 0をindexに代入
+            this.index = 0;
+        }
+
+        /**
+         * start()メソッドで呼ばれる・stop()メソッドで終わる処理
+         * @param now 現在の時間
+         */
+        @Override
+        public void handle( long now ) {
+            // 最初のみstartTimeにnowを設定
+            if( startTime == 0 ){ startTime = now; }
+            
+            // preCountに現在のcountの値を保持
+            preCount = count;
+            // nowとstartTimeとの差分を0.5で割ったものをcountに代入
+            count  = ( now - startTime ) / duration;
+            // 時間が変化した場合
+            if (preCount != count) {
+                // isPlusがtrueの場合indexを1増やす,そのほかの場合は1減らす
+                if (isPlus) {
+                    index++;
+                } else {
+                    index--;
+                }
+                // indexが0より小さいか2より大きい場合indexを１に設定し,isPlusを反転する
+                if ( index < 0 || 2 < index ) {
+                    index = 1;
+                    isPlus = !isPlus;
+                }
+                // イメージビューのsetImageメソッドでindexに対応したキャラの向きの画像に切り替える
+                charaView.setImage(charaImages[index]);
             }
         }
     }
